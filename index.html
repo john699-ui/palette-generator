@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Advanced Palette Generator</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      background: #f9f9f9;
+      color: #333;
+      text-align: center;
+    }
+    input[type="file"] {
+      margin-bottom: 15px;
+    }
+    #palette {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 20px;
+    }
+    .color-swatch {
+      width: 60px;
+      height: 60px;
+      margin: 5px;
+      cursor: pointer;
+      border: 1px solid #ccc;
+      box-shadow: 0 0 4px rgba(0,0,0,0.2);
+    }
+    .color-value {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    canvas {
+      display: none;
+    }
+    .btn {
+      margin-top: 20px;
+      padding: 10px 20px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Advanced Palette Generator Tool</h2>
+  <p>Upload an image and get a complete color palette. Click any color to copy its HEX.</p>
+
+  <input type="file" id="upload" accept="image/*" />
+  <br />
+  <div id="palette"></div>
+  <div id="selectedColor" class="color-value"></div>
+
+  <button class="btn" id="downloadPNG">Download PNG</button>
+  <button class="btn" id="downloadJPG">Download JPEG</button>
+
+  <canvas id="canvas"></canvas>
+
+  <script>
+    const upload = document.getElementById("upload");
+    const palette = document.getElementById("palette");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const selectedColor = document.getElementById("selectedColor");
+
+    upload.addEventListener("change", function () {
+      const file = upload.files[0];
+      if (!file) return;
+
+      const img = new Image();
+      const reader = new FileReader();
+
+      reader.onload = function (e) {
+        img.src = e.target.result;
+      };
+
+      img.onload = function () {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        const colorSet = new Set();
+        const step = 4; // every 4th pixel for performance
+
+        for (let i = 0; i < imageData.length; i += step * 4) {
+          const r = imageData[i];
+          const g = imageData[i + 1];
+          const b = imageData[i + 2];
+          const hex = rgbToHex(r, g, b);
+          colorSet.add(hex);
+        }
+
+        const colors = Array.from(colorSet);
+        colors.sort();
+
+        renderPalette(colors.slice(0, 256)); // show up to 256 colors
+      };
+
+      reader.readAsDataURL(file);
+    });
+
+    function rgbToHex(r, g, b) {
+      return (
+        "#" +
+        [r, g, b]
+          .map((x) => x.toString(16).padStart(2, "0"))
+          .join("")
+          .toUpperCase()
+      );
+    }
+
+    function renderPalette(colors) {
+      palette.innerHTML = "";
+      colors.forEach((hex) => {
+        const swatch = document.createElement("div");
+        swatch.className = "color-swatch";
+        swatch.style.backgroundColor = hex;
+        swatch.title = hex;
+
+        swatch.onclick = () => {
+          navigator.clipboard.writeText(hex);
+          selectedColor.innerText = `Copied: ${hex}`;
+        };
+
+        palette.appendChild(swatch);
+      });
+    }
+
+    function downloadPaletteImage(format = "png") {
+      const exportCanvas = document.createElement("canvas");
+      const swatchSize = 40;
+      const colors = document.querySelectorAll(".color-swatch");
+      const columns = 16;
+      const rows = Math.ceil(colors.length / columns);
+
+      exportCanvas.width = columns * swatchSize;
+      exportCanvas.height = rows * swatchSize;
+
+      const exportCtx = exportCanvas.getContext("2d");
+
+      colors.forEach((swatch, i) => {
+        const col = i % columns;
+        const row = Math.floor(i / columns);
+        exportCtx.fillStyle = swatch.style.backgroundColor;
+        exportCtx.fillRect(col * swatchSize, row * swatchSize, swatchSize, swatchSize);
+      });
+
+      const link = document.createElement("a");
+      link.download = `palette.${format}`;
+      link.href = exportCanvas.toDataURL(`image/${format}`);
+      link.click();
+    }
+
+    document.getElementById("downloadPNG").onclick = () => downloadPaletteImage("png");
+    document.getElementById("downloadJPG").onclick = () => downloadPaletteImage("jpeg");
+  </script>
+
+</body>
+</html>
